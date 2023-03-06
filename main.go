@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -92,6 +93,16 @@ type CollectionItem struct {
 	Response []interface{} `json:"response"`
 }
 
+type Endpoint struct {
+	Name   string
+	Url    string
+	Method string
+}
+
+type Counter struct {
+	count int
+}
+
 func main() {
 	//Добавить валидацию, что Env задана
 	workspaceId := getWorkspaceId()
@@ -112,18 +123,42 @@ func getUrlsFromPostman(collectionId string) int {
 	}
 
 	// TODO переделать на slice который после можно будет сравнивать с выводом получаемым от php artisan route:list
-	printRequestUrlRaw(collectionResponseObject.Collection.Item)
+
+	var endpoints []Endpoint
+	items := collectionResponseObject.Collection.Item
+
+	for _, item := range items {
+		if item.Name == "publicApi" {
+			endpoints = getEndpoints(item.Item, endpoints)
+		}
+	}
+	println(len(endpoints))
+
+	for _, endpoint := range endpoints {
+		println(endpoint.Url)
+	}
 
 	return 0
 }
 
-func printRequestUrlRaw(items []CollectionItem) {
+func getEndpoints(items []CollectionItem, endpoints []Endpoint) []Endpoint {
 	for _, item := range items {
 		if item.Item != nil {
-			printRequestUrlRaw(item.Item)
+			endpoints = getEndpoints(item.Item, endpoints)
+		} else {
+			url := strings.Replace(item.Request.Url.Raw, "{{host}}", "", 1)
+			url = strings.Split(url, "?")[0]
+
+			endpoint := Endpoint{
+				Name:   item.Name,
+				Url:    url,
+				Method: item.Request.Method,
+			}
+			endpoints = append(endpoints, endpoint)
 		}
-		fmt.Println(item.Request.Url.Raw)
 	}
+
+	return endpoints
 }
 
 func getCollectionId(workspaceId string) string {
